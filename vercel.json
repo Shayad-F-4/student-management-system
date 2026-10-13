@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/summary",
+      "destination": "/api/summary.js"
+    },
+    {
+      "source": "/api/students/:match*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/api/students",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/public/$1"
+    }
+  ]
+}

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Complete Student Management REST API application with Node.js, Express, MongoDB Atlas, and Vercel Serverless Function." />
+  <title>Student Management System | Web Dev Technology Lab</title>
+  
+  <!-- Modern Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  
+  <!-- FontAwesome for standard icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Header & Navigation -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-graduation-cap"></i>
+        </div>
+        <div>
+          <h1 class="brand-title">Student Management System</h1>
+          <p class="brand-subtitle">Node.js • Express • MongoDB • Mongoose • Vercel Serverless</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div id="db-status-badge" class="status-badge checking">
+          <span class="status-dot"></span>
+          <span class="status-text">Checking Database...</span>
+        </div>
+        <button id="btn-refresh-all" class="btn btn-secondary" title="Reload all records and summary">
+          <i class="fa-solid fa-rotate"></i>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Application Body -->
+  <main class="main-content">
+    <div class="content-container">
+      
+      <!-- Database Connection Warning Banner (Hidden by default, shown if DB disconnected) -->
+      <div id="db-error-banner" class="alert-banner alert-danger hidden">
+        <div class="alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="alert-body">
+          <h4 class="alert-title">Database Not Connected</h4>
+          <p id="db-error-message">Unable to connect to MongoDB. Please ensure MongoDB is running locally or verify your <code>MONGODB_URI</code> in the <code>.env</code> file.</p>
+        </div>
+        <button id="btn-retry-db" class="btn btn-sm btn-outline-danger">Retry Connection</button>
+      </div>
+
+      <!-- Dashboard Metric Cards (From /api/summary Serverless Function) -->
+      <section class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon-box bg-blue">
+            <i class="fa-solid fa-users"></i>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Total Enrolled Students</span>
+            <h2 id="metric-total-students" class="metric-value">--</h2>
+            <span class="metric-footer"><i class="fa-solid fa-database"></i> Live Database Count</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon-box bg-purple">
+            <i class="fa-solid fa-chart-line"></i>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Class Average Marks</span>
+            <h2 id="metric-average-marks" class="metric-value">--</h2>
+            <span class="metric-footer" id="metric-avg-sub">Computed via Mongoose Aggregation</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon-box bg-green">
+            <i class="fa-solid fa-award"></i>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Top Performer Score</span>
+            <h2 id="metric-top-score" class="metric-value">--</h2>
+            <span class="metric-footer" id="metric-top-name">Highest scored student</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon-box bg-amber">
+            <i class="fa-solid fa-cloud"></i>
+          </div>
+          <div class="metric-info">
+            <span class="metric-label">Summary Architecture</span>
+            <h2 class="metric-value small-text">Serverless</h2>
+            <span class="metric-footer"><code>/api/summary</code> Endpoint</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Main Two-Column Layout -->
+      <div class="app-layout">
+        
+        <!-- Left Column: Student Form & Serverless Top 5 Highlights -->
+        <aside class="sidebar-column">
+          
+          <!-- Add / Edit Student Card -->
+          <div class="card form-card">
+            <div class="card-header">
+              <h3 id="form-card-title">
+                <i class="fa-solid fa-user-plus text-primary"></i> Add New Student
+              </h3>
+              <span id="form-mode-badge" class="badge badge-primary">Create Mode</span>
+            </div>
+            
+            <form id="student-form" novalidate>
+              <input type="hidden" id="student-id" name="studentId" />
+              
+              <div class="form-group">
+                <label for="student-name">Full Name <span class="required">*</span></label>
+                <div class="input-wrapper">
+                  <i class="fa-regular fa-user input-icon"></i>
+                  <input
+                    type="text"
+                    id="student-name"
+                    name="name"
+                    placeholder="e.g. John Doe"
+                    required
+                    minlength="2"
+                    maxlength="100"
+                    autocomplete="off"
+                  />
+                </div>
+                <small class="field-error" id="error-name"></small>
+              </div>
+
+              <div class="form-group">
+                <label for="student-email">Email Address <span class="required">*</span></label>
+                <div class="input-wrapper">
+                  <i class="fa-regular fa-envelope input-icon"></i>
+                  <input
+                    type="email"
+                    id="student-email"
+                    name="email"
+                    placeholder="e.g. john.doe@example.com"
+                    required
+                    autocomplete="off"
+                  />
+                </div>
+                <small class="field-error" id="error-email"></small>
+              </div>
+
+              <div class="form-group">
+                <label for="student-course">Enrolled Course <span class="required">*</span></label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-book-open input-icon"></i>
+                  <input
+                    type="text"
+                    id="student-course"
+                    name="course"
+                    placeholder="e.g. Computer Science & Engg"
+                    required
+                    minlength="2"
+                    maxlength="50"
+                  />
+                </div>
+                <small class="field-error" id="error-course"></small>
+              </div>
+
+              <div class="form-group">
+                <label for="student-marks">Marks (0 to 100) <span class="required">*</span></label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-percent input-icon"></i>
+                  <input
+                    type="number"
+                    id="student-marks"
+                    name="marks"
+                    placeholder="e.g. 88.5"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    required
+                  />
+                </div>
+                <small class="field-error" id="error-marks"></small>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" id="btn-submit-form" class="btn btn-primary btn-block">
+                  <i class="fa-solid fa-floppy-disk"></i>
+                  <span id="btn-submit-text">Save Student</span>
+                </button>
+                <button type="button" id="btn-cancel-edit" class="btn btn-outline-secondary btn-block hidden">
+                  <i class="fa-solid fa-xmark"></i> Cancel Edit
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Top 5 Students Summary Card (Fetched from /api/summary Serverless) -->
+          <div class="card summary-card">
+            <div class="card-header">
+              <h3>
+                <i class="fa-solid fa-trophy text-amber"></i> Top 5 Scorers
+              </h3>
+              <span class="badge badge-info">Vercel Function</span>
+            </div>
+            <div class="card-body">
+              <div id="top-students-list" class="top-list">
+                <div class="empty-state-sm">
+                  <i class="fa-regular fa-folder-open"></i>
+                  <p>No student scores recorded yet</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+        </aside>
+
+        <!-- Right Column: Student Table & Management Controls -->
+        <section class="main-column">
+          <div class="card table-card">
+            
+            <div class="card-header table-header">
+              <div class="table-header-title">
+                <h3><i class="fa-solid fa-table-list text-primary"></i> Registered Students Directory</h3>
+                <span id="students-count-badge" class="badge badge-secondary">0 Records</span>
+              </div>
+              <div class="table-search-box">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input
+                  type="text"
+                  id="search-input"
+                  placeholder="Search by name, email, or course..."
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+
+            <!-- Table Wrapper -->
+            <div class="table-responsive">
+              <table class="students-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Student Name</th>
+                    <th>Email Address</th>
+                    <th>Course</th>
+                    <th>Marks</th>
+                    <th>Grade / Status</th>
+                    <th>Registered At</th>
+                    <th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="students-table-body">
+                  <!-- Dynamic rows rendered by JavaScript -->
+                  <tr id="table-loading-row">
+                    <td colspan="8" class="text-center py-4">
+                      <div class="spinner"></div>
+                      <p class="loading-text">Loading student records from MongoDB...</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Table Footer with Info & Pagination hint -->
+            <div class="table-footer">
+              <span id="table-info-text">Showing all registered student records</span>
+              <span class="table-legend">
+                <span class="badge-dot badge-success"></span> Distinction (&ge;75)
+                <span class="badge-dot badge-info"></span> First Class (&ge;60)
+                <span class="badge-dot badge-warning"></span> Pass (&ge;40)
+                <span class="badge-dot badge-danger"></span> Fail (&lt;40)
+              </span>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-icon text-danger">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h3 class="modal-title">Confirm Deletion</h3>
+        <p class="modal-text">
+          Are you sure you want to delete student <strong id="delete-student-name"></strong>?
+          <br /><span class="text-muted">This action permanently removes the record from MongoDB.</span>
+        </p>
+        <div class="modal-actions">
+          <button id="btn-cancel-delete" class="btn btn-secondary">Cancel</button>
+          <button id="btn-confirm-delete" class="btn btn-danger">
+            <i class="fa-solid fa-trash-can"></i> Delete Permanently
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <p>
+      Connecting Node.js Backend to MongoDB Using Mongoose | Web Development Technology Lab
+    </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
